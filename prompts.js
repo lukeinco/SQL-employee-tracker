@@ -58,7 +58,7 @@ function promptAddRole(departments) {
 }
 
 // Function to prompt the user to enter employee details
-function promptAddEmployee(roles, employees) {
+function promptAddEmployee(roles, employees, departments) {
   return inquirer.prompt([
     {
       type: 'input',
@@ -77,6 +77,15 @@ function promptAddEmployee(roles, employees) {
       choices: roles.map(role => ({
         name: role.title,
         value: role.id
+      }))
+    },
+    {
+      type: 'list',
+      name: 'department_id',
+      message: 'Select the department for the employee:',
+      choices: departments.map(department => ({
+        name: department.name,
+        value: department.id
       }))
     },
     {

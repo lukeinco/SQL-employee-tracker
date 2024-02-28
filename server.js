@@ -1,4 +1,5 @@
 const mysql = require('mysql2');
+const express = require('express');
 const inquirer = require('inquirer');
 const {
   promptMainMenu,
@@ -21,6 +22,7 @@ const db = mysql.createConnection(
   console.log(`Connected to the work_db database.`)
 );
 
+const app = express(); // Initialize express
 
 // Function to start the application
 async function startApp() {
@@ -32,54 +34,31 @@ async function startApp() {
     
     // Perform actions based on user's choice
     if (action === 'View all departments') {
-      async function viewAllDepartments() {
-        const query = "SELECT * FROM departments";
-        db.query(query, (err, rows) => {
-          if (err) {
-            console.log(err.message);
-            return;
-          }
-          console.log("Departments:");
-          console.table(rows);
-        });
-      }
+      // Call function to view all departments
+      await viewAllDepartments();
     } else if (action === 'View all roles') {
-      // TODO: Function to view all roles
-      async function viewAllRoles() {
-        const query = "SELECT * FROM roles";
-        db.query(query, (err, rows) => {
-          if (err) {
-            console.log(err.message);
-            return;
-          }
-          console.log("Roles:");
-          console.table(rows);
-        });
-      }
+      // Call function to view all roles
+      await viewAllRoles();
     } else if (action === 'View all employees') {
-      // TODO: Function to view all employees
-      async function viewAllEmployees() {
-        const query = "SELECT * FROM employees";
-        db.query(query, (err, rows) => {
-          if (err) {
-            console.log(err.message);
-            return;
-          }
-          console.log("Employees:");
-          console.table(rows);
-        });
-      }
+      // Call function to view all employees
+      await viewAllEmployees();
     } else if (action === 'Add a department') {
+      // Call function to add a department
       await addDepartment();
     } else if (action === 'Add a role') {
-      // Prompt user to add a role
-      await addRole();
+      // Fetch departments and pass them to promptAddRole
+      const departments = await fetchDepartments();
+      await addRole(departments);
     } else if (action === 'Add an employee') {
-      // Prompt user to add an employee
-      await addEmployee();
+      // Fetch roles and employees, then pass them to promptAddEmployee
+      const roles = await fetchRoles();
+      const employees = await fetchEmployees();
+      await addEmployee(roles, employees);
     } else if (action === 'Update an employee role') {
-      // Prompt user to update an employee's role
-      await updateEmployeeRole();
+      // Fetch employees and roles, then pass them to promptUpdateEmployeeRole
+      const employees = await fetchEmployees();
+      const roles = await fetchRoles();
+      await updateEmployeeRole(employees, roles);
     } else if (action === 'Exit') {
       console.log('Exiting application...');
       keepRunning = false;
@@ -89,24 +68,65 @@ async function startApp() {
   }
 }
 
+
+// Function to view all departments
+async function viewAllDepartments() {
+  const query = "SELECT * FROM department";
+  db.query(query, (err, rows) => {
+    if (err) {
+      console.log(err.message);
+      return;
+    }
+    console.log("Departments:");
+    console.table(rows);
+  });
+}
+
+// Function to view all roles
+async function viewAllRoles() {
+  const query = "SELECT * FROM role";
+  db.query(query, (err, rows) => {
+    if (err) {
+      console.log(err.message);
+      return;
+    }
+    console.log("Roles:");
+    console.table(rows);
+  });
+}
+
+// Function to view all employees
+async function viewAllEmployees() {
+  const query = "SELECT * FROM employee";
+  db.query(query, (err, rows) => {
+    if (err) {
+      console.log(err.message);
+      return;
+    }
+    console.log("Employees:");
+    console.table(rows);
+  });
+}
+
 // Function to add a department
 async function addDepartment() {
   const departmentData = await promptAddDepartment();
-    const query = "INSERT INTO departments SET ?";
-    db.query(query, departmentData, (err, result) => {
-      if (err) {
-        console.log(err.message);
-        return;
-      }
-      console.log(`Department ${departmentData.name} added successfully!`);
-    });
-  }
-
+  const query = "INSERT INTO department SET ?";
+  db.query(query, departmentData, (err, result) => {
+    if (err) {
+      console.log(err.message);
+      return;
+    }
+    console.log(`Department ${departmentData.name} added successfully!`);
+  });
+}
 
 // Function to add a role
 async function addRole() {
-  const roleData = await promptAddRole();
-    const query = "INSERT INTO roles SET ?";
+  try {
+    const departments = await fetchDepartments();
+    const roleData = await promptAddRole(departments);
+    const query = "INSERT INTO role SET ?";
     db.query(query, roleData, (err, result) => {
       if (err) {
         console.log(err.message);
@@ -114,14 +134,19 @@ async function addRole() {
       }
       console.log(`Role ${roleData.title} added successfully!`);
     });
+  } catch (error) {
+    console.log(error.message);
   }
-  
-
+}
 
 // Function to add an employee
 async function addEmployee() {
-  const employeeData = await promptAddEmployee();
-    const query = "INSERT INTO employees SET ?";
+  try {
+    const departments = await fetchDepartments(); // Fetch department data
+    const roles = await fetchRoles();
+    const employees = await fetchEmployees();
+    const employeeData = await promptAddEmployee(roles, employees, departments); // Pass department data to prompt function
+    const query = "INSERT INTO employee SET ?";
     db.query(query, employeeData, (err, result) => {
       if (err) {
         console.log(err.message);
@@ -129,21 +154,74 @@ async function addEmployee() {
       }
       console.log(`Employee ${employeeData.first_name} ${employeeData.last_name} added successfully!`);
     });
+  } catch (error) {
+    console.log(error.message);
+  }
 }
 
 // Function to update an employee's role
 async function updateEmployeeRole() {
-  const updateData = await promptUpdateEmployeeRole();
-    const { employeeId, roleId } = updateData;
-    const query = "UPDATE employees SET role_id = ? WHERE id = ?";
-    db.query(query, [roleId, employeeId], (err, result) => {
+  try {
+    const employees = await fetchEmployees();
+    const roles = await fetchRoles();
+    const updateData = await promptUpdateEmployeeRole(employees, roles); // Pass employees and roles to the prompt function
+    const { employee_id, role_id } = updateData; // Ensure the correct keys are used
+    const query = "UPDATE employee SET role_id = ? WHERE id = ?";
+    db.query(query, [role_id, employee_id], (err, result) => {
       if (err) {
         console.log(err.message);
         return;
       }
       console.log(`Employee's role updated successfully!`);
     });
+  } catch (error) {
+    console.log(error.message);
+  }
 }
+
+
+// Function to fetch all departments from the database
+async function fetchDepartments() {
+  return new Promise((resolve, reject) => {
+    const query = "SELECT * FROM department";
+    db.query(query, (err, rows) => {
+      if (err) {
+        reject(err);
+        return;
+      }
+      resolve(rows);
+    });
+  });
+}
+
+// Function to fetch all roles from the database
+async function fetchRoles() {
+  return new Promise((resolve, reject) => {
+    const query = "SELECT * FROM role";
+    db.query(query, (err, rows) => {
+      if (err) {
+        reject(err);
+        return;
+      }
+      resolve(rows);
+    });
+  });
+}
+
+// Function to fetch all employees from the database
+async function fetchEmployees() {
+  return new Promise((resolve, reject) => {
+    const query = "SELECT * FROM employee";
+    db.query(query, (err, rows) => {
+      if (err) {
+        reject(err);
+        return;
+      }
+      resolve(rows);
+    });
+  });
+}
+
 
 // Start the application
 startApp();
