@@ -66,8 +66,12 @@ async function startApp() {
       console.log('Invalid choice. Please try again.');
     }
   }
-}
 
+  // Start the server after the app is done running
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
 
 // Function to view all departments
 async function viewAllDepartments() {
@@ -115,6 +119,7 @@ async function addDepartment() {
   db.query(query, departmentData, (err, result) => {
     if (err) {
       console.log(err.message);
+      console.log("hi");
       return;
     }
     console.log(`Department ${departmentData.name} added successfully!`);
@@ -122,9 +127,8 @@ async function addDepartment() {
 }
 
 // Function to add a role
-async function addRole() {
+async function addRole(departments) {
   try {
-    const departments = await fetchDepartments();
     const roleData = await promptAddRole(departments);
     const query = "INSERT INTO role SET ?";
     db.query(query, roleData, (err, result) => {
@@ -140,12 +144,9 @@ async function addRole() {
 }
 
 // Function to add an employee
-async function addEmployee() {
+async function addEmployee(roles, employees, departments) {
   try {
-    const departments = await fetchDepartments(); // Fetch department data
-    const roles = await fetchRoles();
-    const employees = await fetchEmployees();
-    const employeeData = await promptAddEmployee(roles, employees, departments); // Pass department data to prompt function
+    const employeeData = await promptAddEmployee(roles, employees, departments);
     const query = "INSERT INTO employee SET ?";
     db.query(query, employeeData, (err, result) => {
       if (err) {
@@ -160,12 +161,10 @@ async function addEmployee() {
 }
 
 // Function to update an employee's role
-async function updateEmployeeRole() {
+async function updateEmployeeRole(employees, roles) {
   try {
-    const employees = await fetchEmployees();
-    const roles = await fetchRoles();
-    const updateData = await promptUpdateEmployeeRole(employees, roles); // Pass employees and roles to the prompt function
-    const { employee_id, role_id } = updateData; // Ensure the correct keys are used
+    const updateData = await promptUpdateEmployeeRole(employees, roles);
+    const { employee_id, role_id } = updateData;
     const query = "UPDATE employee SET role_id = ? WHERE id = ?";
     db.query(query, [role_id, employee_id], (err, result) => {
       if (err) {
@@ -178,7 +177,6 @@ async function updateEmployeeRole() {
     console.log(error.message);
   }
 }
-
 
 // Function to fetch all departments from the database
 async function fetchDepartments() {
@@ -222,10 +220,5 @@ async function fetchEmployees() {
   });
 }
 
-
 // Start the application
 startApp();
-
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
